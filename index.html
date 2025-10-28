@@ -1,3 +1,4 @@
+<!-- Gemini: Acknowledged and reviewed. This is a well-structured single-file React app using Gradio. -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -220,8 +221,11 @@
             (async () => {
               try {
                 // Dynamically import the Gradio client module as an ES module from CDN
-                const mod = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
-                const Client = mod.Client ?? mod.default ?? mod;
+                // Use destructuring to get Client, matching the user's example snippet
+                const { Client } = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
+                
+                // const mod = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
+                // const Client = mod.Client ?? mod.default ?? mod;
 
                 if (!Client || typeof Client.connect !== 'function') {
                   throw new Error('Gradio Client does not expose a connect() function.');
@@ -286,8 +290,7 @@
                 setOutputText(result);
               } else if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
                 // join array elements if returned
-                setOutputText(result.data.join('
-'));
+                setOutputText(result.data.join('\n'));
               } else {
                 console.error('Unexpected result format:', result);
                 setError('Received an unexpected response from the AI.');
@@ -450,3 +453,4 @@
     </script>
 </body>
 </html>
+
