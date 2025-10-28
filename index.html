@@ -203,63 +203,34 @@
           // State for app status
           const [isLoading, setIsLoading] = useState(false);
           const [error, setError] = useState(null);
-          const [gradioClient, setGradioClient] =useState(null);
-          const [clientLoading, setClientLoading] = useState(true);
+          // Removed Gradio client state
+          // const [gradioClient, setGradioClient] =useState(null);
+          // const [clientLoading, setClientLoading] = useState(true);
 
-          // Effect to connect to Gradio client using dynamic import (using the object-based API you provided)
+          // Removed useEffect hook for loading Gradio client
+          /*
           useEffect(() => {
             let cancelled = false;
-
-            (async () => {
-              try {
-                // Dynamically import the Gradio client module as an ES module from CDN
-                // Use destructuring to get Client, matching the user's example snippet
-                // FIX: Use the .mjs (ES Module) build to avoid 'require is not defined' error
-                const { Client } = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.mjs');
-                
-                // const mod = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
-                // const Client = mod.Client ?? mod.default ?? mod;
-
-                if (!Client || typeof Client.connect !== 'function') {
-                  throw new Error('Gradio Client does not expose a connect() function.');
-                }
-
-                try {
-                  const client = await Client.connect('Dedeep007/aicloak');
-                  if (!cancelled) {
-                    setGradioClient(client);
-                    setClientLoading(false);
-                    console.log('Gradio client connected.');
-                  }
-                } catch (err) {
-                  console.error('Failed to connect to Gradio client instance:', err);
-                  if (!cancelled) {
-                    setError('Failed to connect to the NeuroSoul AI. Please refresh.');
-                    setClientLoading(false);
-                  }
-                }
-              } catch (err) {
-                console.error('Dynamic import of Gradio client failed:', err);
-                if (!cancelled) {
-                  setError('Error loading AI client library (import failed). Please refresh.');
-                  setClientLoading(false);
-                }
-              }
-            })();
-
+...
             return () => { cancelled = true; };
           }, []); // Empty dependency array so it runs only once // Empty dependency array so it runs only once
+          */
 
           // Handle the "Humanize" button click
           const handleHumanize = async () => {
+            // Removed Gradio client check
+            /*
             if (!gradioClient) {
               setError('AI client is not ready. Please wait.');
               return;
             }
+            */
 
             setIsLoading(true);
             setError(null);
             setOutputText('');
+
+            const apiUrl = 'https://dedeep007-aicloak.hf.space/gradio_api/mcp/';
 
             try {
               // Use the object-based payload as requested
@@ -271,10 +242,24 @@
                 random_seed: String(randomSeed),
               };
 
-              // Use predict on the connected client with the object payload
-              const result = await gradioClient.predict('/run_humanizer', payload);
+              // Use fetch to make a direct POST request
+              const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload),
+              });
+
+              if (!response.ok) {
+                 const errorText = await response.text();
+                 throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+              }
+              
+              const result = await response.json();
 
               // Handle different possible response shapes
+              // Re-using old logic as endpoint might mimic Gradio client response
               if (result && result.data && typeof result.data[0] === 'string') {
                 setOutputText(result.data[0]);
               } else if (result && result.data && typeof result.data === 'string') {
@@ -284,13 +269,22 @@
               } else if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
                 // join array elements if returned
                 setOutputText(result.data.join('\n'));
-              } else {
+              } 
+              // This endpoint might just return the text directly
+              else if (typeof result === 'string') {
+                 setOutputText(result);
+              }
+              // Or in a specific key
+              else if (result && typeof result.humanized_text === 'string') {
+                 setOutputText(result.humanized_text);
+              }
+              else {
                 console.error('Unexpected result format:', result);
                 setError('Received an unexpected response from the AI.');
               }
             } catch (err) {
               console.error('Error during humanization:', err);
-              setError('An error occurred while humanizing the text.');
+              setError(`An error occurred: ${err.message}`);
             } finally {
               setIsLoading(false);
             }
@@ -418,13 +412,11 @@
                 <div className="mt-8">
                   <button
                     onClick={handleHumanize}
-                    disabled={isLoading || clientLoading || !inputText}
-                    className={`w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out ${isLoading || clientLoading || !inputText ? 'opacity-50 cursor-wait hover:scale-100' : ''}`}
+                    disabled={isLoading || !inputText}
+                    className={`w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out ${isLoading || !inputText ? 'opacity-50 cursor-wait hover:scale-100' : ''}`}
                   >
                     {isLoading ? (
                       "Humanizing..."
-                    ) : clientLoading ? (
-                      "Connecting to AI..."
                     ) : (
                       "✨ Humanize Text"
                     )}
@@ -446,5 +438,7 @@
     </script>
 </body>
 </html>
+
+
 
 
