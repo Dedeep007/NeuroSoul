@@ -223,8 +223,13 @@
                     try {
                         // Dynamically import the Gradio client ES module
                         // We use a specific version for stability, but you can use @latest
-                        const module = await import('https://cdn.jsdelivr.net/npm/@gradio/client@0.14.0/dist/index.js');
-                        const Client = module.Client;
+                        // ✅ Use browser-safe ESM version (no require)
+                        const module = await import("https://cdn.jsdelivr.net/npm/@gradio/client@latest/dist/index.min.mjs");
+                        const { Client } = module;
+                        
+                        // ✅ Connect to your public Space
+                        const app = await Client.connect("Dedeep007/aicloak");
+
                         
                         // Connect to the public Hugging Face Space
                         const app = await Client.connect("Dedeep007/aicloak");
