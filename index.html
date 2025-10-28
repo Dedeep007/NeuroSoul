@@ -53,7 +53,8 @@
         // Use React hooks from the global 'React' object
         const { useState, useEffect, useRef, useCallback } = React;
 
-        // Helper component for SVG icons
+        // Helper component for SVG icons - REMOVED
+        /*
         const IconLoader = () => (
           <svg
             className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
@@ -95,6 +96,7 @@
             <path d="M21.5 6.5L19 9" />
           </svg>
         );
+        */
 
         // Helper component for sliders
         const ParameterSlider = ({
@@ -439,20 +441,11 @@
                     className="w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out disabled:opacity-50 disabled:cursor-wait disabled:hover:scale-100"
                   >
                     {isLoading ? (
-                      <React.Fragment>
-                        <IconLoader />
-                        Humanizing...
-                      </React.Fragment>
+                      "Humanizing..."
                     ) : clientLoading ? (
-                      <React.Fragment>
-                        <IconLoader />
-                        Connecting to AI...
-                      </React.Fragment>
+                      "Connecting to AI..."
                     ) : (
-                      <React.Fragment>
-                        <IconSparkles />
-                        Humanize Text
-                      </React.Fragment>
+                      "Humanize Text"
                     )}
                   </button>
                   {error && (
@@ -472,3 +465,4 @@
     </script>
 </body>
 </html>
+
