@@ -213,50 +213,31 @@
           const [gradioClient, setGradioClient] =useState(null);
           const [clientLoading, setClientLoading] = useState(true);
 
-          // Effect to connect to Gradio client using dynamic import
+          // Effect to connect to Gradio client using dynamic import (using the object-based API you provided)
           useEffect(() => {
             let cancelled = false;
 
             (async () => {
               try {
-                // Dynamically import the Gradio client as a module.
+                // Dynamically import the Gradio client module as an ES module from CDN
                 const mod = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
                 const Client = mod.Client ?? mod.default ?? mod;
 
-                if (Client && typeof Client.connect === 'function') {
-                  try {
-                    const client = await Client.connect('Dedeep007/aicloak');
-                    if (!cancelled) {
-                      setGradioClient(client);
-                      setClientLoading(false);
-                      console.log('Gradio client connected.');
-                    }
-                  } catch (err) {
-                    console.error('Failed to connect to Gradio client instance:', err);
-                    if (!cancelled) {
-                      setError('Failed to connect to the NeuroSoul AI. Please refresh.');
-                      setClientLoading(false);
-                    }
-                  }
-                } else if (mod && mod.connect) {
-                  // older/alternate shape
-                  try {
-                    const client = await mod.connect('Dedeep007/aicloak');
-                    if (!cancelled) {
-                      setGradioClient(client);
-                      setClientLoading(false);
-                    }
-                  } catch (err) {
-                    console.error('Failed to connect (alt) to Gradio client:', err);
-                    if (!cancelled) {
-                      setError('Failed to connect to the NeuroSoul AI. Please refresh.');
-                      setClientLoading(false);
-                    }
-                  }
-                } else {
-                  console.error('Gradio client module loaded but did not expose expected API:', mod);
+                if (!Client || typeof Client.connect !== 'function') {
+                  throw new Error('Gradio Client does not expose a connect() function.');
+                }
+
+                try {
+                  const client = await Client.connect('Dedeep007/aicloak');
                   if (!cancelled) {
-                    setError('Error loading AI client library (import failed). Please refresh.');
+                    setGradioClient(client);
+                    setClientLoading(false);
+                    console.log('Gradio client connected.');
+                  }
+                } catch (err) {
+                  console.error('Failed to connect to Gradio client instance:', err);
+                  if (!cancelled) {
+                    setError('Failed to connect to the NeuroSoul AI. Please refresh.');
                     setClientLoading(false);
                   }
                 }
@@ -270,7 +251,7 @@
             })();
 
             return () => { cancelled = true; };
-          }, []); // Empty dependency array so it runs only once
+          }, []); // Empty dependency array so it runs only once // Empty dependency array so it runs only once
 
           // Handle the "Humanize" button click
           const handleHumanize = async () => {
@@ -284,22 +265,29 @@
             setOutputText('');
 
             try {
-              // Send positional array payload to Gradio predict endpoint
-              const payload = [
-                inputText,
-                Number(replaceProb),
-                Number(semThreshold),
-                Number(freqRatio),
-                Number(randomSeed),
-              ];
+              // Use the object-based payload as requested
+              const payload = {
+                text: inputText,
+                replace_prob_pct: Number(replaceProb),
+                sem_threshold: Number(semThreshold),
+                freq_ratio_pct: Number(freqRatio),
+                random_seed: String(randomSeed),
+              };
 
+              // Use predict on the connected client with the object payload
               const result = await gradioClient.predict('/run_humanizer', payload);
 
+              // Handle different possible response shapes
               if (result && result.data && typeof result.data[0] === 'string') {
                 setOutputText(result.data[0]);
+              } else if (result && result.data && typeof result.data === 'string') {
+                setOutputText(result.data);
               } else if (result && typeof result === 'string') {
-                // fallback if client returns string directly
                 setOutputText(result);
+              } else if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
+                // join array elements if returned
+                setOutputText(result.data.join('
+'));
               } else {
                 console.error('Unexpected result format:', result);
                 setError('Received an unexpected response from the AI.');
@@ -311,6 +299,7 @@
               setIsLoading(false);
             }
           };
+
 
           return (
             <div className="relative min-h-screen w-full text-gray-100 flex items-center justify-center p-4 overflow-hidden">
