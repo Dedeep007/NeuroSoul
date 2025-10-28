@@ -255,7 +255,7 @@
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Accept': 'application/json' // FIX: Only accept JSON to avoid event-stream
+                  'Accept': 'application/json, text/event-stream' // FIX: Re-add text/event-stream to fix 406
                 },
                 body: JSON.stringify(jsonRpcPayload), // Send the wrapped payload
               });
@@ -265,7 +265,19 @@
                  throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
               }
               
-              const result = await response.json();
+              // FIX: Read as text first, as the response is an event-stream
+              const responseText = await response.text();
+              
+              // Find the JSON data within the event stream text
+              const dataLine = responseText.split('\n').find(line => line.startsWith('data: '));
+              
+              if (!dataLine) {
+                throw new Error("Could not find 'data:' line in event-stream response.");
+              }
+
+              // Extract the JSON string and parse it
+              const jsonString = dataLine.substring('data: '.length);
+              const result = JSON.parse(jsonString);
 
               // Check for a JSON-RPC level error
               if (result.error) {
@@ -314,7 +326,7 @@
               <div className="relative z-10 bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-6xl">
                 {/* Header */}
                 <div className="text-center mb-8">
-                  <h1 className="text-4xl md:text-5xl font-extrabold text-sky-400 pb-2 drop-shadow-lg"> {/* Changed color and removed bg-clip-text/text-transparent */}
+                  <h1 className="text-4xl md:text-5xl font-extrabold text-purple-600 pb-2 drop-shadow-lg"> {/* Changed logo color to match button */}
                     🧠 NeuroSoul
                   </h1>
                   <p className="text-lg text-gray-400">
@@ -454,11 +466,4 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
 
