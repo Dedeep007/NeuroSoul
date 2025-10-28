@@ -1,21 +1,17 @@
-<!-- Gemini: Acknowledged and reviewed. This is a well-structured single-file React app using Gradio. -->
-<!DOCTYPE html>
+<!-- Gemini: Acknowledged and reviewed. This is a well-structured single-file React app using Gradio. --><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>NeuroSoul AI Humanizer</title>
     
-    <!-- 1. Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- 1. Tailwind CSS --><script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- 2. Google Font (Inter) -->
-    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <!-- 2. Google Font (Inter) --><link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     
-    <!-- 3. Tailwind Config for Inter Font -->
-    <script>
+    <!-- 3. Tailwind Config for Inter Font --><script>
         tailwind.config = {
             theme: {
                 extend: {
@@ -27,12 +23,10 @@
         }
     </script>
     
-    <!-- 4. React & ReactDOM (UMD builds used by Babel below) -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <!-- 4. React & ReactDOM (UMD builds used by Babel below) --><script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     
-    <!-- 5. Babel Standalone (for JSX) -->
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- 5. Babel Standalone (for JSX) --><script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <style>
         /* Base styling */
@@ -43,11 +37,9 @@
 </head>
 <body class="bg-gray-900">
     
-    <!-- React app will mount here -->
-    <div id="root"></div>
+    <!-- React app will mount here --><div id="root"></div>
 
-    <!-- React App Code (transpiled by Babel) -->
-    <script type="text/babel">
+    <!-- React App Code (transpiled by Babel) --><script type="text/babel">
         // NOTE: We don't use a static `import` at the top because the Gradio client package
         // is an ES module and may throw an 'export' error when loaded via script tags.
         // Instead we dynamically import it inside the effect below which keeps JSX/Babel
@@ -138,7 +130,7 @@
               y: Math.random() * canvas.height,
               vx: (Math.random() - 0.5) * 0.5,
               vy: (Math.random() - 0.5) * 0.5,
-              radius: Math.random() * 1.5 + 0.5,
+              radius: Math.random() * 3 + 1.5, // Increased node size
               opacity: Math.random() * 0.5 + 0.3,
             }));
 
@@ -222,7 +214,8 @@
               try {
                 // Dynamically import the Gradio client module as an ES module from CDN
                 // Use destructuring to get Client, matching the user's example snippet
-                const { Client } = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
+                // FIX: Use the .mjs (ES Module) build to avoid 'require is not defined' error
+                const { Client } = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.mjs');
                 
                 // const mod = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
                 // const Client = mod.Client ?? mod.default ?? mod;
@@ -311,7 +304,7 @@
               <div className="relative z-10 bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-6xl">
                 {/* Header */}
                 <div className="text-center mb-8">
-                  <h1 className="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500 pb-2">
+                  <h1 className="text-4xl md:text-5xl font-extrabold text-sky-400 pb-2 drop-shadow-lg"> {/* Changed color and removed bg-clip-text/text-transparent */}
                     🧠 NeuroSoul
                   </h1>
                   <p className="text-lg text-gray-400">
@@ -453,4 +446,5 @@
     </script>
 </body>
 </html>
+
 
