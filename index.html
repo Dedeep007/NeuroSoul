@@ -211,11 +211,12 @@
             const [isLoading, setIsLoading] = useState(false);
             const [error, setError] = useState(null);
             
-            // State for Gradio client
-            const [gradioClient, setGradioClient] = useState(null);
-            const [clientLoading, setClientLoading] = useState(true);
+            // State for Gradio client - REMOVED
+            // const [gradioClient, setGradioClient] = useState(null);
+            // const [clientLoading, setClientLoading] = useState(true);
 
-            // Effect to load and connect the Gradio client
+            // Effect to load and connect the Gradio client - REMOVED
+            /*
             useEffect(() => {
                 let cancelled = false;
 
@@ -223,12 +224,11 @@
                     try {
                         // Dynamically import the Gradio client ES module
                         // We use a specific version for stability, but you can use @latest
-                        // ✅ Use browser-safe ESM version (no require)
-                        const module = await import("https://cdn.jsdelivr.net/npm/@gradio/client@latest/dist/index.min.mjs");
-                        const { Client } = module;
+                        const module = await import('https://cdn.jsdelivr.net/npm/@gradio/client@0.14.0/dist/index.js');
+                        const Client = module.Client;
                         
-                        const gradioApp = await Client.connect("Dedeep007/aicloak");
-
+                        // Connect to the public Hugging Face Space
+                        const app = await Client.connect("Dedeep007/aicloak");
                         
                         if (!cancelled) {
                             console.log("Gradio client connected successfully.");
@@ -253,41 +253,110 @@
                     // You could add client disconnect logic here if needed
                 };
             }, []); // Empty dependency array so it runs only once
+            */
 
             // Handle the "Humanize" button click
             const handleHumanize = async () => {
-                if (clientLoading || !gradioClient) {
-                    setError('AI client is not ready. Please wait.');
-                    return;
-                }
+                // Gradio client check - REMOVED
+                /*
+...
+                */
 
                 setIsLoading(true);
                 setError(null);
                 setOutputText('');
 
+                // MODIFIED: This is the correct endpoint for submitting the job
+                const postUrl = 'https://dedeep007-aicloak.hf.space/gradio_api/call/run_humanizer';
+
                 try {
-                    // This is the payload for the Gradio endpoint
-                    const payload = {
-                        text: inputText,
-                        replace_prob_pct: Number(replaceProb),
-                        sem_threshold: Number(semThreshold),
-                        freq_ratio_pct: Number(freqRatio),
-                        random_seed: String(randomSeed), // API expects a string for the seed
+                    // MODIFIED: This is the payload structure the /call/ endpoint expects
+                    const postPayload = {
+                        data: [
+                            inputText,
+                            Number(replaceProb),
+                            Number(semThreshold),
+                            Number(freqRatio),
+                            String(randomSeed) // API expects a string for the seed
+                        ]
                     };
 
-                    // Use the Gradio client to call the prediction endpoint
-                    const result = await gradioClient.predict("/run_humanizer", payload);
+                    // JSON-RPC wrapper - REMOVED
+                    /*
+                    const jsonRpcPayload = {
+...
+                    };
+                    */
 
-                    console.log("API Result:", result);
+                    // REPLACED: Switched to the new two-step fetch logic
+                    
+                    // Step 1: POST to submit the job
+                    const postResponse = await fetch(postUrl, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(postPayload)
+                    });
 
-                    // The Gradio client simplifies the response. 
-                    // The main output is typically the first element in the 'data' array.
-                    if (result && result.data && typeof result.data[0] === 'string') {
-                        setOutputText(result.data[0]);
-                    } else {
-                        console.error('Unexpected API response format:', result);
-                        setError('Received an unexpected response from the AI.');
+                    if (!postResponse.ok) {
+                        const errorText = await postResponse.text();
+                        // Check if the error is 404, which was the original problem
+                        if(postResponse.status === 404) {
+                             throw new Error(`HTTP error (POST)! status: 404. The API endpoint seems to be incorrect or down.`);
+                        }
+                        throw new Error(`HTTP error (POST)! status: ${postResponse.status}, message: ${errorText}`);
                     }
+
+                    const postResult = await postResponse.json();
+                    const eventId = postResult.event_id;
+
+                    if (!eventId) {
+                        throw new Error("Could not get a valid event ID from the server.");
+                    }
+
+                    // Step 2: GET to stream the result
+                    const getUrl = `https://dedeep007-aicloak.hf.space/gradio_api/call/run_humanizer/${eventId}`;
+                    
+                    // We fetch from the GET endpoint. The browser will wait until the stream completes.
+                    const getResponse = await fetch(getUrl, {
+                        method: 'GET',
+                        headers: { 'Accept': 'text/event-stream' }
+                    });
+
+                    if (!getResponse.ok) {
+                        const errorText = await getResponse.text();
+                        throw new Error(`HTTP error (GET)! status: ${getResponse.status}, message: ${errorText}`);
+                    }
+
+                    // Read the entire event stream as text
+                    const streamText = await getResponse.text();
+
+                    // Parse the event stream to find the completion message
+                    const lines = streamText.trim().split('\n');
+                    const completedLine = lines.find(line => line.includes('"msg": "process_completed"'));
+                    
+                    if (!completedLine) {
+                        // Check for a failure message
+                        const failedLine = lines.find(line => line.includes('"msg": "process_failed"'));
+                        if (failedLine) {
+                            const errorJson = JSON.parse(failedLine.substring('data: '.length));
+                            throw new Error(`AI processing failed: ${errorJson.output?.error || 'Unknown error'}`);
+                        }
+                        console.error("Stream response (no completion):", streamText);
+                        throw new Error("Stream did not complete or returned an unexpected response.");
+                    }
+
+                    // Extract the JSON string from the "data: " prefix
+                    const jsonString = completedLine.substring('data: '.length);
+                    const result = JSON.parse(jsonString);
+
+                    // Extract the final output from the complex result object
+                    if (result.output && result.output.data && typeof result.output.data[0] === 'string') {
+                        setOutputText(result.output.data[0]);
+                    } else {
+                        console.error("Unexpected data structure in completed stream:", result);
+                        throw new Error("Unexpected data structure in completed stream.");
+                    }
+
                 } catch (err) {
                     console.error('Error during humanization:', err);
                     setError(`An error occurred: ${err.message}`);
@@ -298,7 +367,8 @@
 
             // Helper to determine button text
             const getButtonText = () => {
-                if (clientLoading) return "Loading AI Client...";
+                // MODIFIED: Removed clientLoading check
+                // if (clientLoading) return "Loading AI Client...";
                 if (isLoading) return "Humanizing...";
                 return "✨ Humanize Text";
             };
@@ -424,8 +494,9 @@
                         <div className="mt-8">
                             <button
                                 onClick={handleHumanize}
-                                disabled={isLoading || clientLoading || !inputText}
-                                className={`w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-purple-600 hover:bg-purple-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out ${isLoading || clientLoading || !inputText ? 'opacity-50 cursor-wait hover:scale-100' : ''}`}
+                                // MODIFIED: Removed clientLoading from disabled check
+                                disabled={isLoading || !inputText}
+                                className={`w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-purple-600 hover:bg-purple-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out ${isLoading || !inputText ? 'opacity-50 cursor-wait hover:scale-100' : ''}`}
                             >
                                 {getButtonText()}
                             </button>
@@ -446,3 +517,5 @@
     </script>
 </body>
 </html>
+
+
