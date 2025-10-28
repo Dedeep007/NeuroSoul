@@ -216,25 +216,43 @@
             const [clientLoading, setClientLoading] = useState(true);
 
             // Effect to load and connect the Gradio client
-            try {
-                // ✅ Use browser-safe ESM version (no require)
-                const module = await import("https://cdn.jsdelivr.net/npm/@gradio/client@latest/dist/index.min.mjs");
-                const { Client } = module;
-            
-                // ✅ Connect to your public Space
-                const gradioApp = await Client.connect("Dedeep007/aicloak");
-            
-                if (!cancelled) {
-                    console.log("Gradio client connected successfully.");
-                    setGradioClient(gradioApp);
-                }
-            } catch (err) {
-                console.error("Failed to load or connect Gradio client:", err);
-                if (!cancelled) setError(`Failed to load AI client: ${err.message}`);
-            } finally {
-                if (!cancelled) setClientLoading(false);
-            }
+            useEffect(() => {
+                let cancelled = false;
 
+                const loadClient = async () => {
+                    try {
+                        // Dynamically import the Gradio client ES module
+                        // We use a specific version for stability, but you can use @latest
+                        // ✅ Use browser-safe ESM version (no require)
+                        const module = await import("https://cdn.jsdelivr.net/npm/@gradio/client@latest/dist/index.min.mjs");
+                        const { Client } = module;
+                        
+                        const gradioApp = await Client.connect("Dedeep007/aicloak");
+
+                        
+                        if (!cancelled) {
+                            console.log("Gradio client connected successfully.");
+                            setGradioClient(app);
+                        }
+                    } catch (err) {
+                        console.error("Failed to load or connect Gradio client:", err);
+                        if (!cancelled) {
+                            setError(`Failed to load AI client: ${err.message}`);
+                        }
+                    } finally {
+                        if (!cancelled) {
+                            setClientLoading(false);
+                        }
+                    }
+                };
+
+                loadClient();
+
+                return () => { 
+                    cancelled = true; 
+                    // You could add client disconnect logic here if needed
+                };
+            }, []); // Empty dependency array so it runs only once
 
             // Handle the "Humanize" button click
             const handleHumanize = async () => {
