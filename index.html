@@ -1,445 +1,474 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeuroSoul AI Humanizer</title>
+    
+    <!-- 1. Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- 2. Google Font (Inter) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    
+    <!-- 3. Tailwind Config for Inter Font -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        inter: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    
+    <!-- 4. React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+    
+    <!-- 5. Babel Standalone (for JSX) -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <!-- 6. Gradio Client (Loaded directly to fix errors) -->
+    <script src="https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js"></script>
+    
+    <style>
+        /* Base styling */
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="bg-gray-900">
+    
+    <!-- React app will mount here -->
+    <div id="root"></div>
 
-// Helper component for SVG icons
-const IconLoader = () => (
-  <svg
-    className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-    xmlns="http://www.w3.org/2000/svg"
-    fill="none"
-    viewBox="0 0 24 24"
-  >
-    <circle
-      className="opacity-25"
-      cx="12"
-      cy="12"
-      r="10"
-      stroke="currentColor"
-      strokeWidth="4"
-    ></circle>
-    <path
-      className="opacity-75"
-      fill="currentColor"
-      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-    ></path>
-  </svg>
-);
+    <!-- 7. React App Code (transpiled by Babel) -->
+    <script type="text/babel">
+        // Use React hooks from the global 'React' object
+        const { useState, useEffect, useRef, useCallback } = React;
 
-const IconSparkles = () => (
-  <svg
-    xmlns="http://www.w3.org/2000/svg"
-    width="24"
-    height="24"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="mr-2 h-5 w-5"
-  >
-    <path d="M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9Z" />
-    <path d="M18 8V4.5" />
-    <path d="M21.5 6.5L19 9" />
-  </svg>
-);
+        // Helper component for SVG icons
+        const IconLoader = () => (
+          <svg
+            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            ></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+            ></path>
+          </svg>
+        );
 
-// Helper component for sliders
-const ParameterSlider = ({
-  label,
-  id,
-  min,
-  max,
-  step,
-  value,
-  onChange,
-  displayValue,
-  description, // Add description prop
-}) => (
-  <div className="space-y-2">
-    <div className="flex justify-between items-center">
-      <label htmlFor={id} className="block text-sm font-medium text-gray-300">
-        {label}
-      </label>
-      <span className="text-sm font-mono text-purple-300 bg-gray-700 px-2 py-0.5 rounded">
-        {displayValue || value}
-      </span>
-    </div>
-    <input
-      type="range"
-      id={id}
-      min={min}
-      max={max}
-      step={step}
-      value={value}
-      onChange={onChange}
-      className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
-    />
-    {description && (
-      <p className="text-xs text-gray-400 mt-1.5">{description}</p>
-    )}
-  </div>
-);
+        const IconSparkles = () => (
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="24"
+            height="24"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="mr-2 h-5 w-5"
+          >
+            <path d="M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9Z" />
+            <path d="M18 8V4.5" />
+            <path d="M21.5 6.5L19 9" />
+          </svg>
+        );
 
-// Nodal Background Component - ADDED BACK
-const NodalBackground = () => {
-  const canvasRef = useRef(null);
-  const animationFrameId = useRef(null);
-
-  const resizeCanvas = useCallback((canvas, ctx) => {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
-    ctx.fillStyle = 'rgba(0, 0, 0, 0)'; // Transparent background
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-  }, []);
-
-  const drawNodes = useCallback((ctx, nodes, lines) => {
-    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
-
-    // Draw lines first
-    lines.forEach(line => {
-      ctx.beginPath();
-      ctx.moveTo(line.start.x, line.start.y);
-      ctx.lineTo(line.end.x, line.end.y);
-      ctx.strokeStyle = `rgba(100, 50, 200, ${line.opacity})`; // Purple/blue lines
-      ctx.lineWidth = 0.5;
-      ctx.stroke();
-    });
-
-    // Then draw nodes
-    nodes.forEach(node => {
-      ctx.beginPath();
-      ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2, false);
-      ctx.fillStyle = `rgba(150, 100, 250, ${node.opacity})`; // Lighter purple nodes
-      ctx.fill();
-    });
-  }, []);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-
-    resizeCanvas(canvas, ctx); // Initial resize
-
-    const numNodes = Math.floor((window.innerWidth + window.innerHeight) / 100);
-    const nodes = Array.from({ length: numNodes }, () => ({
-      x: Math.random() * canvas.width,
-      y: Math.random() * canvas.height,
-      vx: (Math.random() - 0.5) * 0.5,
-      vy: (Math.random() - 0.5) * 0.5,
-      radius: Math.random() * 1.5 + 0.5,
-      opacity: Math.random() * 0.5 + 0.3,
-    }));
-
-    const animate = () => {
-      const lines = [];
-      nodes.forEach(node => {
-        // Update position
-        node.x += node.vx;
-        node.y += node.vy;
-
-        // Bounce off walls
-        if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
-        if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
-
-        // Connect to nearby nodes
-        nodes.forEach(otherNode => {
-          if (node === otherNode) return;
-          const dist = Math.sqrt(
-            (node.x - otherNode.x) ** 2 + (node.y - otherNode.y) ** 2
-          );
-          const maxDist = 120; // Max distance for lines
-          if (dist < maxDist) {
-            lines.push({
-              start: node,
-              end: otherNode,
-              opacity: (1 - dist / maxDist) * 0.3, // Fading lines
-            });
-          }
-        });
-      });
-
-      drawNodes(ctx, nodes, lines);
-      animationFrameId.current = requestAnimationFrame(animate);
-    };
-
-    const handleResize = () => resizeCanvas(canvas, ctx);
-    window.addEventListener('resize', handleResize);
-
-    animationFrameId.current = requestAnimationFrame(animate);
-
-    return () => {
-      cancelAnimationFrame(animationFrameId.current);
-      window.removeEventListener('resize', handleResize);
-    };
-  }, [resizeCanvas, drawNodes]);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 z-0 opacity-50" // Adjusted opacity for background effect
-      style={{ pointerEvents: 'none' }} // Ensure canvas doesn't interfere with clicks
-    ></canvas>
-  );
-};
-
-
-export default function App() {
-  // State for inputs and outputs
-  const [inputText, setInputText] = useState(
-    'The aforementioned document elucidates the intricate details of the ongoing investigation, highlighting the pivotal role of forensic analysis in discerning the perpetrator.'
-  );
-  const [outputText, setOutputText] = useState('');
-
-  // State for parameters
-  const [replaceProb, setReplaceProb] = useState(13); // Default to recommended range
-  const [semThreshold, setSemThreshold] = useState(0.85); // Default to recommended range
-  const [freqRatio, setFreqRatio] = useState(10); // Updated default to recommended range
-  const [randomSeed, setRandomSeed] = useState(42);
-
-  // State for app status
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [gradioClient, setGradioClient] = useState(null);
-  const [clientLoading, setClientLoading] = useState(true);
-
-  // Effect to load Gradio client and connect
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js';
-    script.async = true;
-
-    // --- FIX: Added retry mechanism ---
-    const checkGradio = (retries) => {
-      if (window.gradio_client) {
-        console.log('Gradio client found on window.');
-        window.gradio_client.Client.connect('Dedeep007/aicloak')
-          .then((client) => {
-            setGradioClient(client);
-            setClientLoading(false);
-            console.log('Gradio client connected.');
-          })
-          .catch((err) => {
-            console.error('Failed to connect to Gradio client:', err);
-            setError('Failed to connect to the NeuroSoul AI. Please refresh.');
-            setClientLoading(false);
-          });
-      } else if (retries > 0) {
-        console.log(`Gradio client not found, retrying... (${retries} retries left)`);
-        setTimeout(() => checkGradio(retries - 1), 100); // Check again in 100ms
-      } else {
-        console.error('Gradio client script loaded but not found on window after retries.');
-        setError('Error loading AI client library. Please refresh.');
-        setClientLoading(false);
-      }
-    };
-
-    script.onload = () => {
-      console.log('Gradio script loaded.');
-      checkGradio(20); // Start checking with 20 retries (2 seconds)
-    };
-    // --- End Fix ---
-
-    script.onerror = () => {
-      setError('Failed to load AI client script.');
-      setClientLoading(false);
-    };
-
-    document.body.appendChild(script);
-
-    // Cleanup
-    return () => {
-      document.body.removeChild(script);
-    };
-  }, []);
-
-  // Handle the "Humanize" button click
-  const handleHumanize = async () => {
-    if (!gradioClient) {
-      setError('AI client is not ready. Please wait.');
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    setOutputText('');
-
-    try {
-      // Construct the payload as per the Gradio API
-      const payload = {
-        text: inputText,
-        replace_prob_pct: Number(replaceProb),
-        sem_threshold: Number(semThreshold),
-        freq_ratio_pct: Number(freqRatio),
-        random_seed: Number(randomSeed),
-      };
-
-      const result = await gradioClient.predict('/run_humanizer', payload);
-
-      // Gradio results often come in an array
-      if (result && result.data && typeof result.data[0] === 'string') {
-        setOutputText(result.data[0]);
-      } else {
-        console.error('Unexpected result format:', result);
-        setError('Received an unexpected response from the AI.');
-      }
-    } catch (err) {
-      console.error('Error during humanization:', err);
-      setError('An error occurred while humanizing the text.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  return (
-    <div className="relative min-h-screen w-full bg-gray-900 text-gray-100 flex items-center justify-center p-4 font-inter overflow-hidden">
-      <NodalBackground /> {/* Nodal background component */}
-
-      <div className="relative z-10 bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-6xl">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <h1 className="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500 pb-2">
-            NeuroSoul
-          </h1>
-          <p className="text-lg text-gray-400">
-            Humanize your text with AI
-          </p>
-        </div>
-
-        {/* Main Content: Input, Config, Output */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
-          {/* Left Column: Input + Config */}
-          <div className="space-y-6">
-            {/* Input Text */}
-            <div>
-              <label
-                htmlFor="input-text"
-                className="block text-xl font-semibold mb-3 text-gray-200"
-              >
-                Your Text
+        // Helper component for sliders
+        const ParameterSlider = ({
+          label,
+          id,
+          min,
+          max,
+          step,
+          value,
+          onChange,
+          displayValue,
+          description,
+        }) => (
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <label htmlFor={id} className="block text-sm font-medium text-gray-300">
+                {label}
               </label>
-              <textarea
-                id="input-text"
-                rows="10"
-                className="w-full bg-gray-700 border-gray-600 rounded-lg p-4 text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-inner"
-                placeholder="Enter text to humanize..."
-                value={inputText}
-                onChange={(e) => setInputText(e.target.value)}
-              ></textarea>
+              <span className="text-sm font-mono text-purple-300 bg-gray-700 px-2 py-0.5 rounded">
+                {displayValue || value}
+              </span>
             </div>
+            <input
+              type="range"
+              id={id}
+              min={min}
+              max={max}
+              step={step}
+              value={value}
+              onChange={onChange}
+              className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-purple-500"
+            />
+            {description && (
+              <p className="text-xs text-gray-400 mt-1.5">{description}</p>
+            )}
+          </div>
+        );
 
-            {/* Configuration */}
-            <div>
-              <h3 className="text-xl font-semibold mb-4 text-gray-200">
-                Configuration
-              </h3>
-              <div className="space-y-5 bg-gray-900/50 p-5 rounded-lg">
-                <ParameterSlider
-                  label="Replace Probability"
-                  id="replace-prob"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={replaceProb}
-                  onChange={(e) => setReplaceProb(e.target.value)}
-                  displayValue={`${replaceProb}%`}
-                  description="How many words might be replaced. Recommended: 11-15%"
-                />
-                <ParameterSlider
-                  label="Semantic Threshold"
-                  id="sem-threshold"
-                  min="0"
-                  max="1"
-                  step="0.01"
-                  value={semThreshold}
-                  onChange={(e) => setSemThreshold(e.target.value)}
-                  description="How similar the new word should be to the original. Recommended: 0.8-0.9"
-                />
-                <ParameterSlider
-                  label="Frequency Ratio"
-                  id="freq-ratio"
-                  min="0"
-                  max="100"
-                  step="1"
-                  value={freqRatio}
-                  onChange={(e) => setFreqRatio(e.target.value)}
-                  displayValue={`${freqRatio}%`}
-                  description="Similar word frequency vs. original. Higher % is safer, lower % is creative. Recommended: 5-10%"
-                />
-                <div>
-                  <label
-                    htmlFor="random-seed"
-                    className="block text-sm font-medium text-gray-300 mb-2"
-                  >
-                    Random Seed
-                  </label>
-                  <input
-                    type="number"
-                    id="random-seed"
-                    value={randomSeed}
-                    onChange={(e) => setRandomSeed(Number(e.target.value))}
-                    className="w-full bg-gray-700 border-gray-600 rounded-lg p-2.5 text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-inner"
-                  />
-                  <p className="text-xs text-gray-400 mt-1.5">
-                    Seed for randomization. Change for different results.
+        // Nodal Background Component
+        const NodalBackground = () => {
+          const canvasRef = useRef(null);
+          const animationFrameId = useRef(null);
+
+          const resizeCanvas = useCallback((canvas, ctx) => {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            ctx.fillStyle = 'rgba(0, 0, 0, 0)'; // Transparent background
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+          }, []);
+
+          const drawNodes = useCallback((ctx, nodes, lines) => {
+            ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+
+            // Draw lines first
+            lines.forEach(line => {
+              ctx.beginPath();
+              ctx.moveTo(line.start.x, line.start.y);
+              ctx.lineTo(line.end.x, line.end.y);
+              ctx.strokeStyle = `rgba(100, 50, 200, ${line.opacity})`; // Purple/blue lines
+              ctx.lineWidth = 0.5;
+              ctx.stroke();
+            });
+
+            // Then draw nodes
+            nodes.forEach(node => {
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2, false);
+              ctx.fillStyle = `rgba(150, 100, 250, ${node.opacity})`; // Lighter purple nodes
+              ctx.fill();
+            });
+          }, []);
+
+          useEffect(() => {
+            const canvas = canvasRef.current;
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            resizeCanvas(canvas, ctx); // Initial resize
+
+            const numNodes = Math.floor((window.innerWidth + window.innerHeight) / 100);
+            const nodes = Array.from({ length: numNodes }, () => ({
+              x: Math.random() * canvas.width,
+              y: Math.random() * canvas.height,
+              vx: (Math.random() - 0.5) * 0.5,
+              vy: (Math.random() - 0.5) * 0.5,
+              radius: Math.random() * 1.5 + 0.5,
+              opacity: Math.random() * 0.5 + 0.3,
+            }));
+
+            const animate = () => {
+              const lines = [];
+              nodes.forEach(node => {
+                // Update position
+                node.x += node.vx;
+                node.y += node.vy;
+
+                // Bounce off walls
+                if (node.x < 0 || node.x > canvas.width) node.vx *= -1;
+                if (node.y < 0 || node.y > canvas.height) node.vy *= -1;
+
+                // Connect to nearby nodes
+                nodes.forEach(otherNode => {
+                  if (node === otherNode) return;
+                  const dist = Math.sqrt(
+                    (node.x - otherNode.x) ** 2 + (node.y - otherNode.y) ** 2
+                  );
+                  const maxDist = 120; // Max distance for lines
+                  if (dist < maxDist) {
+                    lines.push({
+                      start: node,
+                      end: otherNode,
+                      opacity: (1 - dist / maxDist) * 0.3, // Fading lines
+                    });
+                  }
+                });
+              });
+
+              drawNodes(ctx, nodes, lines);
+              animationFrameId.current = requestAnimationFrame(animate);
+            };
+
+            const handleResize = () => resizeCanvas(canvas, ctx);
+            window.addEventListener('resize', handleResize);
+
+            animationFrameId.current = requestAnimationFrame(animate);
+
+            return () => {
+              cancelAnimationFrame(animationFrameId.current);
+              window.removeEventListener('resize', handleResize);
+            };
+          }, [resizeCanvas, drawNodes]);
+
+          return (
+            <canvas
+              ref={canvasRef}
+              className="absolute inset-0 z-0 opacity-50"
+              style={{ pointerEvents: 'none' }}
+            ></canvas>
+          );
+        };
+
+        // Main App Component
+        function App() {
+          // State for inputs and outputs
+          const [inputText, setInputText] = useState(
+            'The aforementioned document elucidates the intricate details of the ongoing investigation, highlighting the pivotal role of forensic analysis in discerning the perpetrator.'
+          );
+          const [outputText, setOutputText] = useState('');
+
+          // State for parameters
+          const [replaceProb, setReplaceProb] = useState(13);
+          const [semThreshold, setSemThreshold] = useState(0.85);
+          const [freqRatio, setFreqRatio] = useState(10);
+          const [randomSeed, setRandomSeed] = useState(42);
+
+          // State for app status
+          const [isLoading, setIsLoading] = useState(false);
+          const [error, setError] = useState(null);
+          const [gradioClient, setGradioClient] = useState(null);
+          const [clientLoading, setClientLoading] = useState(true);
+
+          // Effect to connect to Gradio client
+          // This is now much simpler because the script is loaded in the <head>
+          useEffect(() => {
+            if (window.gradio_client) {
+              console.log('Gradio client found on window. Connecting...');
+              window.gradio_client.Client.connect('Dedeep007/aicloak')
+                .then((client) => {
+                  setGradioClient(client);
+                  setClientLoading(false);
+                  console.log('Gradio client connected.');
+                })
+                .catch((err) => {
+                  console.error('Failed to connect to Gradio client:', err);
+                  setError('Failed to connect to the NeuroSoul AI. Please refresh.');
+                  setClientLoading(false);
+                });
+            } else {
+              console.error('Gradio client not found on window. Check script tags.');
+              setError('Error loading AI client library. Please refresh.');
+              setClientLoading(false);
+            }
+          }, []); // Empty dependency array so it runs only once
+
+          // Handle the "Humanize" button click
+          const handleHumanize = async () => {
+            if (!gradioClient) {
+              setError('AI client is not ready. Please wait.');
+              return;
+            }
+
+            setIsLoading(true);
+            setError(null);
+            setOutputText('');
+
+            try {
+              const payload = {
+                text: inputText,
+                replace_prob_pct: Number(replaceProb),
+                sem_threshold: Number(semThreshold),
+                freq_ratio_pct: Number(freqRatio),
+                random_seed: Number(randomSeed),
+              };
+
+              const result = await gradioClient.predict('/run_humanizer', payload);
+
+              if (result && result.data && typeof result.data[0] === 'string') {
+                setOutputText(result.data[0]);
+              } else {
+                console.error('Unexpected result format:', result);
+                setError('Received an unexpected response from the AI.');
+              }
+            } catch (err) {
+              console.error('Error during humanization:', err);
+              setError('An error occurred while humanizing the text.');
+            } finally {
+              setIsLoading(false);
+            }
+          };
+
+          return (
+            <div className="relative min-h-screen w-full text-gray-100 flex items-center justify-center p-4 overflow-hidden">
+              <NodalBackground /> {/* Nodal background component */}
+
+              <div className="relative z-10 bg-gray-800 rounded-2xl shadow-2xl p-6 md:p-8 w-full max-w-6xl">
+                {/* Header */}
+                <div className="text-center mb-8">
+                  <h1 className="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500 pb-2">
+                    NeuroSoul
+                  </h1>
+                  <p className="text-lg text-gray-400">
+                    Humanize your text with AI
                   </p>
+                </div>
+
+                {/* Main Content: Input, Config, Output */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
+                  {/* Left Column: Input + Config */}
+                  <div className="space-y-6">
+                    {/* Input Text */}
+                    <div>
+                      <label
+                        htmlFor="input-text"
+                        className="block text-xl font-semibold mb-3 text-gray-200"
+                      >
+                        Your Text
+                      </label>
+                      <textarea
+                        id="input-text"
+                        rows="10"
+                        className="w-full bg-gray-700 border-gray-600 rounded-lg p-4 text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-inner"
+                        placeholder="Enter text to humanize..."
+                        value={inputText}
+                        onChange={(e) => setInputText(e.target.value)}
+                      ></textarea>
+                    </div>
+
+                    {/* Configuration */}
+                    <div>
+                      <h3 className="text-xl font-semibold mb-4 text-gray-200">
+                        Configuration
+                      </h3>
+                      <div className="space-y-5 bg-gray-900/50 p-5 rounded-lg">
+                        <ParameterSlider
+                          label="Replace Probability"
+                          id="replace-prob"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={replaceProb}
+                          onChange={(e) => setReplaceProb(e.target.value)}
+                          displayValue={`${replaceProb}%`}
+                          description="How many words might be replaced. Recommended: 11-15%"
+                        />
+                        <ParameterSlider
+                          label="Semantic Threshold"
+                          id="sem-threshold"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={semThreshold}
+                          onChange={(e) => setSemThreshold(e.target.value)}
+                          description="How similar the new word should be to the original. Recommended: 0.8-0.9"
+                        />
+                        <ParameterSlider
+                          label="Frequency Ratio"
+                          id="freq-ratio"
+                          min="0"
+                          max="100"
+                          step="1"
+                          value={freqRatio}
+                          onChange={(e) => setFreqRatio(e.target.value)}
+                          displayValue={`${freqRatio}%`}
+                          description="Similar word frequency vs. original. Higher % is safer, lower % is creative. Recommended: 5-10%"
+                        />
+                        <div>
+                          <label
+                            htmlFor="random-seed"
+                            className="block text-sm font-medium text-gray-300 mb-2"
+                          >
+                            Random Seed
+                          </label>
+                          <input
+                            type="number"
+                            id="random-seed"
+                            value={randomSeed}
+                            onChange={(e) => setRandomSeed(Number(e.target.value))}
+                            className="w-full bg-gray-700 border-gray-600 rounded-lg p-2.5 text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-inner"
+                          />
+                          <p className="text-xs text-gray-400 mt-1.5">
+                            Seed for randomization. Change for different results.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Right Column: Output */}
+                  <div className="flex flex-col">
+                    <label
+                      htmlFor="output-text"
+                      className="block text-xl font-semibold mb-3 text-gray-200"
+                    >
+                      Humanized Output
+                    </label>
+                    <textarea
+                      id="output-text"
+                      rows="10"
+                      className="w-full h-full flex-grow bg-gray-700 border-gray-600 rounded-lg p-4 text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-inner"
+                      placeholder="Your humanized text will appear here..."
+                      value={outputText}
+                      readOnly
+                    ></textarea>
+                  </div>
+                </div>
+
+                {/* Footer: Button and Status */}
+                <div className="mt-8">
+                  <button
+                    onClick={handleHumanize}
+                    disabled={isLoading || clientLoading || !inputText}
+                    className="w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out disabled:opacity-50 disabled:cursor-wait disabled:hover:scale-100"
+                  >
+                    {isLoading ? (
+                      <React.Fragment>
+                        <IconLoader />
+                        Humanizing...
+                      </React.Fragment>
+                    ) : clientLoading ? (
+                      <React.Fragment>
+                        <IconLoader />
+                        Connecting to AI...
+                      </React.Fragment>
+                    ) : (
+                      <React.Fragment>
+                        <IconSparkles />
+                        Humanize Text
+                      </React.Fragment>
+                    )}
+                  </button>
+                  {error && (
+                    <p className="text-red-400 text-center mt-4 text-sm">{error}</p>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
+          );
+        }
 
-          {/* Right Column: Output */}
-          <div className="flex flex-col">
-            <label
-              htmlFor="output-text"
-              className="block text-xl font-semibold mb-3 text-gray-200"
-            >
-              Humanized Output
-            </label>
-            <textarea
-              id="output-text"
-              rows="10"
-              className="w-full h-full flex-grow bg-gray-700 border-gray-600 rounded-lg p-4 text-gray-100 focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all shadow-inner"
-              placeholder="Your humanized text will appear here..."
-              value={outputText}
-              readOnly
-            ></textarea>
-          </div>
-        </div>
+        // 8. Mount the React app
+        const container = document.getElementById('root');
+        const root = ReactDOM.createRoot(container);
+        root.render(<App />);
 
-        {/* Footer: Button and Status */}
-        <div className="mt-8">
-          <button
-            onClick={handleHumanize}
-            disabled={isLoading || clientLoading || !inputText}
-            className="w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out disabled:opacity-50 disabled:cursor-wait disabled:hover:scale-100"
-          >
-            {isLoading ? (
-              <>
-                <IconLoader />
-                Humanizing...
-              </>
-            ) : clientLoading ? (
-              <>
-                <IconLoader />
-                Connecting to AI...
-              </>
-            ) : (
-              <>
-                <IconSparkles />
-                Humanize Text
-              </>
-            )}
-          </button>
-          {error && (
-            <p className="text-red-400 text-center mt-4 text-sm">{error}</p>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-
-
-
+    </script>
+</body>
+</html>
