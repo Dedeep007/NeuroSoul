@@ -227,12 +227,8 @@
                         const module = await import("https://cdn.jsdelivr.net/npm/@gradio/client@latest/dist/index.min.mjs");
                         const { Client } = module;
                         
-                        // ✅ Connect to your public Space
-                        const app = await Client.connect("Dedeep007/aicloak");
+                        const gradioApp = await Client.connect("Dedeep007/aicloak");
 
-                        
-                        // Connect to the public Hugging Face Space
-                        const app = await Client.connect("Dedeep007/aicloak");
                         
                         if (!cancelled) {
                             console.log("Gradio client connected successfully.");
