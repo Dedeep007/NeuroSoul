@@ -255,7 +255,7 @@
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
-                  'Accept': 'application/json, text/event-stream' // FIX: Added Accept header
+                  'Accept': 'application/json' // FIX: Only accept JSON to avoid event-stream
                 },
                 body: JSON.stringify(jsonRpcPayload), // Send the wrapped payload
               });
@@ -429,7 +429,7 @@
                   <button
                     onClick={handleHumanize}
                     disabled={isLoading || !inputText}
-                    className={`w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out ${isLoading || !inputText ? 'opacity-50 cursor-wait hover:scale-100' : ''}`}
+                    className={`w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-purple-600 hover:bg-purple-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out ${isLoading || !inputText ? 'opacity-50 cursor-wait hover:scale-100' : ''}`}
                   >
                     {isLoading ? (
                       "Humanizing..."
@@ -454,6 +454,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
