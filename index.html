@@ -233,8 +233,8 @@
             const apiUrl = 'https://dedeep007-aicloak.hf.space/gradio_api/mcp/';
 
             try {
-              // Use the object-based payload as requested
-              const payload = {
+              // This is the payload for the method itself
+              const paramsPayload = {
                 text: inputText,
                 replace_prob_pct: Number(replaceProb),
                 sem_threshold: Number(semThreshold),
@@ -242,13 +242,22 @@
                 random_seed: String(randomSeed),
               };
 
+              // This is the JSON-RPC wrapper
+              const jsonRpcPayload = {
+                jsonrpc: "2.0",
+                method: "/run_humanizer", // The method name
+                params: paramsPayload,     // The parameters for the method
+                id: Math.random().toString(36).substring(2) // A unique ID
+              };
+
               // Use fetch to make a direct POST request
               const response = await fetch(apiUrl, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
+                  'Accept': 'application/json, text/event-stream' // FIX: Added Accept header
                 },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(jsonRpcPayload), // Send the wrapped payload
               });
 
               if (!response.ok) {
@@ -258,28 +267,35 @@
               
               const result = await response.json();
 
-              // Handle different possible response shapes
-              // Re-using old logic as endpoint might mimic Gradio client response
-              if (result && result.data && typeof result.data[0] === 'string') {
-                setOutputText(result.data[0]);
-              } else if (result && result.data && typeof result.data === 'string') {
-                setOutputText(result.data);
-              } else if (result && typeof result === 'string') {
-                setOutputText(result);
-              } else if (result && result.data && Array.isArray(result.data) && result.data.length > 0) {
+              // Check for a JSON-RPC level error
+              if (result.error) {
+                throw new Error(`JSON-RPC Error: ${result.error.message} (Code: ${result.error.code})`);
+              }
+
+              // The actual application data is in the 'result' field
+              const appData = result.result;
+
+              // Handle different possible response shapes (using the old logic on the new 'appData' object)
+              if (appData && appData.data && typeof appData.data[0] === 'string') {
+                setOutputText(appData.data[0]);
+              } else if (appData && appData.data && typeof appData.data === 'string') {
+                setOutputText(appData.data);
+              } else if (appData && typeof appData === 'string') {
+                setOutputText(appData);
+              } else if (appData && appData.data && Array.isArray(appData.data) && appData.data.length > 0) {
                 // join array elements if returned
-                setOutputText(result.data.join('\n'));
+                setOutputText(appData.data.join('\n'));
               } 
               // This endpoint might just return the text directly
-              else if (typeof result === 'string') {
-                 setOutputText(result);
+              else if (typeof appData === 'string') {
+                 setOutputText(appData);
               }
               // Or in a specific key
-              else if (result && typeof result.humanized_text === 'string') {
-                 setOutputText(result.humanized_text);
+              else if (appData && typeof appData.humanized_text === 'string') {
+                 setOutputText(appData.humanized_text);
               }
               else {
-                console.error('Unexpected result format:', result);
+                console.error('Unexpected appData format:', appData);
                 setError('Received an unexpected response from the AI.');
               }
             } catch (err) {
@@ -438,6 +454,8 @@
     </script>
 </body>
 </html>
+
+
 
 
 
