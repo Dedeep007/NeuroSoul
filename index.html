@@ -26,15 +26,12 @@
         }
     </script>
     
-    <!-- 4. React & ReactDOM -->
+    <!-- 4. React & ReactDOM (UMD builds used by Babel below) -->
     <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
     <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
     
     <!-- 5. Babel Standalone (for JSX) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    
-    <!-- 6. Gradio Client (Loaded directly to fix errors) -->
-    <script src="https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js"></script>
     
     <style>
         /* Base styling */
@@ -48,55 +45,14 @@
     <!-- React app will mount here -->
     <div id="root"></div>
 
-    <!-- 7. React App Code (transpiled by Babel) -->
+    <!-- React App Code (transpiled by Babel) -->
     <script type="text/babel">
-        // Use React hooks from the global 'React' object
+        // NOTE: We don't use a static `import` at the top because the Gradio client package
+        // is an ES module and may throw an 'export' error when loaded via script tags.
+        // Instead we dynamically import it inside the effect below which keeps JSX/Babel
+        // transpilation working while still loading the module correctly.
+
         const { useState, useEffect, useRef, useCallback } = React;
-
-        // Helper component for SVG icons - REMOVED
-        /*
-        const IconLoader = () => (
-          <svg
-            className="animate-spin -ml-1 mr-3 h-5 w-5 text-white"
-            xmlns="http://www.w3.org/2000/svg"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <circle
-              className="opacity-25"
-              cx="12"
-              cy="12"
-              r="10"
-              stroke="currentColor"
-              strokeWidth="4"
-            ></circle>
-            <path
-              className="opacity-75"
-              fill="currentColor"
-              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-            ></path>
-          </svg>
-        );
-
-        const IconSparkles = () => (
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="24"
-            height="24"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className="mr-2 h-5 w-5"
-          >
-            <path d="M12 3a6 6 0 0 0 9 9a9 9 0 1 1-9-9Z" />
-            <path d="M18 8V4.5" />
-            <path d="M21.5 6.5L19 9" />
-          </svg>
-        );
-        */
 
         // Helper component for sliders
         const ParameterSlider = ({
@@ -116,7 +72,7 @@
                 {label}
               </label>
               <span className="text-sm font-mono text-purple-300 bg-gray-700 px-2 py-0.5 rounded">
-                {displayValue || value}
+                {displayValue !== undefined ? displayValue : String(value)}
               </span>
             </div>
             <input
@@ -143,8 +99,7 @@
           const resizeCanvas = useCallback((canvas, ctx) => {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            ctx.fillStyle = 'rgba(0, 0, 0, 0)'; // Transparent background
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
           }, []);
 
           const drawNodes = useCallback((ctx, nodes, lines) => {
@@ -155,7 +110,7 @@
               ctx.beginPath();
               ctx.moveTo(line.start.x, line.start.y);
               ctx.lineTo(line.end.x, line.end.y);
-              ctx.strokeStyle = `rgba(100, 50, 200, ${line.opacity})`; // Purple/blue lines
+              ctx.strokeStyle = `rgba(100, 50, 200, ${line.opacity})`;
               ctx.lineWidth = 0.5;
               ctx.stroke();
             });
@@ -164,7 +119,7 @@
             nodes.forEach(node => {
               ctx.beginPath();
               ctx.arc(node.x, node.y, node.radius, 0, Math.PI * 2, false);
-              ctx.fillStyle = `rgba(150, 100, 250, ${node.opacity})`; // Lighter purple nodes
+              ctx.fillStyle = `rgba(150, 100, 250, ${node.opacity})`;
               ctx.fill();
             });
           }, []);
@@ -176,7 +131,7 @@
 
             resizeCanvas(canvas, ctx); // Initial resize
 
-            const numNodes = Math.floor((window.innerWidth + window.innerHeight) / 100);
+            const numNodes = Math.max(20, Math.floor((window.innerWidth + window.innerHeight) / 100));
             const nodes = Array.from({ length: numNodes }, () => ({
               x: Math.random() * canvas.width,
               y: Math.random() * canvas.height,
@@ -200,15 +155,15 @@
                 // Connect to nearby nodes
                 nodes.forEach(otherNode => {
                   if (node === otherNode) return;
-                  const dist = Math.sqrt(
-                    (node.x - otherNode.x) ** 2 + (node.y - otherNode.y) ** 2
-                  );
+                  const dx = node.x - otherNode.x;
+                  const dy = node.y - otherNode.y;
+                  const dist = Math.sqrt(dx * dx + dy * dy);
                   const maxDist = 120; // Max distance for lines
                   if (dist < maxDist) {
                     lines.push({
                       start: node,
                       end: otherNode,
-                      opacity: (1 - dist / maxDist) * 0.3, // Fading lines
+                      opacity: (1 - dist / maxDist) * 0.3,
                     });
                   }
                 });
@@ -255,30 +210,66 @@
           // State for app status
           const [isLoading, setIsLoading] = useState(false);
           const [error, setError] = useState(null);
-          const [gradioClient, setGradioClient] = useState(null);
+          const [gradioClient, setGradioClient] =useState(null);
           const [clientLoading, setClientLoading] = useState(true);
 
-          // Effect to connect to Gradio client
-          // This is now much simpler because the script is loaded in the <head>
+          // Effect to connect to Gradio client using dynamic import
           useEffect(() => {
-            if (window.gradio_client) {
-              console.log('Gradio client found on window. Connecting...');
-              window.gradio_client.Client.connect('Dedeep007/aicloak')
-                .then((client) => {
-                  setGradioClient(client);
+            let cancelled = false;
+
+            (async () => {
+              try {
+                // Dynamically import the Gradio client as a module.
+                const mod = await import('https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js');
+                const Client = mod.Client ?? mod.default ?? mod;
+
+                if (Client && typeof Client.connect === 'function') {
+                  try {
+                    const client = await Client.connect('Dedeep007/aicloak');
+                    if (!cancelled) {
+                      setGradioClient(client);
+                      setClientLoading(false);
+                      console.log('Gradio client connected.');
+                    }
+                  } catch (err) {
+                    console.error('Failed to connect to Gradio client instance:', err);
+                    if (!cancelled) {
+                      setError('Failed to connect to the NeuroSoul AI. Please refresh.');
+                      setClientLoading(false);
+                    }
+                  }
+                } else if (mod && mod.connect) {
+                  // older/alternate shape
+                  try {
+                    const client = await mod.connect('Dedeep007/aicloak');
+                    if (!cancelled) {
+                      setGradioClient(client);
+                      setClientLoading(false);
+                    }
+                  } catch (err) {
+                    console.error('Failed to connect (alt) to Gradio client:', err);
+                    if (!cancelled) {
+                      setError('Failed to connect to the NeuroSoul AI. Please refresh.');
+                      setClientLoading(false);
+                    }
+                  }
+                } else {
+                  console.error('Gradio client module loaded but did not expose expected API:', mod);
+                  if (!cancelled) {
+                    setError('Error loading AI client library (import failed). Please refresh.');
+                    setClientLoading(false);
+                  }
+                }
+              } catch (err) {
+                console.error('Dynamic import of Gradio client failed:', err);
+                if (!cancelled) {
+                  setError('Error loading AI client library (import failed). Please refresh.');
                   setClientLoading(false);
-                  console.log('Gradio client connected.');
-                })
-                .catch((err) => {
-                  console.error('Failed to connect to Gradio client:', err);
-                  setError('Failed to connect to the NeuroSoul AI. Please refresh.');
-                  setClientLoading(false);
-                });
-            } else {
-              console.error('Gradio client not found on window. Check script tags.');
-              setError('Error loading AI client library. Please refresh.');
-              setClientLoading(false);
-            }
+                }
+              }
+            })();
+
+            return () => { cancelled = true; };
           }, []); // Empty dependency array so it runs only once
 
           // Handle the "Humanize" button click
@@ -293,18 +284,22 @@
             setOutputText('');
 
             try {
-              const payload = {
-                text: inputText,
-                replace_prob_pct: Number(replaceProb),
-                sem_threshold: Number(semThreshold),
-                freq_ratio_pct: Number(freqRatio),
-                random_seed: Number(randomSeed),
-              };
+              // Send positional array payload to Gradio predict endpoint
+              const payload = [
+                inputText,
+                Number(replaceProb),
+                Number(semThreshold),
+                Number(freqRatio),
+                Number(randomSeed),
+              ];
 
               const result = await gradioClient.predict('/run_humanizer', payload);
 
               if (result && result.data && typeof result.data[0] === 'string') {
                 setOutputText(result.data[0]);
+              } else if (result && typeof result === 'string') {
+                // fallback if client returns string directly
+                setOutputText(result);
               } else {
                 console.error('Unexpected result format:', result);
                 setError('Received an unexpected response from the AI.');
@@ -325,7 +320,7 @@
                 {/* Header */}
                 <div className="text-center mb-8">
                   <h1 className="text-4xl md:text-5xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-purple-400 to-pink-500 pb-2">
-                    NeuroSoul
+                    🧠 NeuroSoul
                   </h1>
                   <p className="text-lg text-gray-400">
                     Humanize your text with AI
@@ -367,7 +362,7 @@
                           max="100"
                           step="1"
                           value={replaceProb}
-                          onChange={(e) => setReplaceProb(e.target.value)}
+                          onChange={(e) => setReplaceProb(Number(e.target.value))}
                           displayValue={`${replaceProb}%`}
                           description="How many words might be replaced. Recommended: 11-15%"
                         />
@@ -378,7 +373,8 @@
                           max="1"
                           step="0.01"
                           value={semThreshold}
-                          onChange={(e) => setSemThreshold(e.target.value)}
+                          onChange={(e) => setSemThreshold(Number(e.target.value))}
+                          displayValue={semThreshold.toFixed(2)}
                           description="How similar the new word should be to the original. Recommended: 0.8-0.9"
                         />
                         <ParameterSlider
@@ -388,7 +384,7 @@
                           max="100"
                           step="1"
                           value={freqRatio}
-                          onChange={(e) => setFreqRatio(e.target.value)}
+                          onChange={(e) => setFreqRatio(Number(e.target.value))}
                           displayValue={`${freqRatio}%`}
                           description="Similar word frequency vs. original. Higher % is safer, lower % is creative. Recommended: 5-10%"
                         />
@@ -438,14 +434,14 @@
                   <button
                     onClick={handleHumanize}
                     disabled={isLoading || clientLoading || !inputText}
-                    className="w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out disabled:opacity-50 disabled:cursor-wait disabled:hover:scale-100"
+                    className={`w-full max-w-md mx-auto flex items-center justify-center py-3 px-6 rounded-lg font-semibold text-lg text-white bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 shadow-lg transform hover:scale-105 transition-transform duration-300 ease-in-out ${isLoading || clientLoading || !inputText ? 'opacity-50 cursor-wait hover:scale-100' : ''}`}
                   >
                     {isLoading ? (
                       "Humanizing..."
                     ) : clientLoading ? (
                       "Connecting to AI..."
                     ) : (
-                      "Humanize Text"
+                      "✨ Humanize Text"
                     )}
                   </button>
                   {error && (
@@ -457,7 +453,7 @@
           );
         }
 
-        // 8. Mount the React app
+        // Mount the React app
         const container = document.getElementById('root');
         const root = ReactDOM.createRoot(container);
         root.render(<App />);
@@ -465,4 +461,3 @@
     </script>
 </body>
 </html>
-
