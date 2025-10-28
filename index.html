@@ -256,114 +256,163 @@
             */
 
             // Handle the "Humanize" button click
-            const handleHumanize = async () => {
-                // Gradio client check - REMOVED
-                /*
-...
-                */
+            // Replace your existing handleHumanize with this function
+const handleHumanize = async () => {
+  setIsLoading(true);
+  setError(null);
+  setOutputText('');
 
-                setIsLoading(true);
-                setError(null);
-                setOutputText('');
+  const postUrl = 'https://dedeep007-aicloak.hf.space/gradio_api/call/run_humanizer';
+  try {
+    const postPayload = {
+      data: [
+        inputText,
+        Number(replaceProb),
+        Number(semThreshold),
+        Number(freqRatio),
+        String(randomSeed)
+      ]
+    };
 
-                // MODIFIED: This is the correct endpoint for submitting the job
-                const postUrl = 'https://dedeep007-aicloak.hf.space/gradio_api/call/run_humanizer';
+    // Step 1: submit job
+    const postResponse = await fetch(postUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(postPayload),
+      // optional: keep credentials if server expects cookies
+      // credentials: 'include'
+    });
 
-                try {
-                    // MODIFIED: This is the payload structure the /call/ endpoint expects
-                    const postPayload = {
-                        data: [
-                            inputText,
-                            Number(replaceProb),
-                            Number(semThreshold),
-                            Number(freqRatio),
-                            String(randomSeed) // API expects a string for the seed
-                        ]
-                    };
+    if (!postResponse.ok) {
+      const errText = await postResponse.text().catch(()=>'<no-body>');
+      throw new Error(`POST failed: ${postResponse.status} ${postResponse.statusText} — ${errText}`);
+    }
 
-                    // JSON-RPC wrapper - REMOVED
-                    /*
-                    const jsonRpcPayload = {
-...
-                    };
-                    */
+    const postJson = await postResponse.json().catch(()=>null);
+    console.log('POST response', postJson);
+    const eventId = postJson?.event_id || postJson?.data?.[0]?.event_id;
+    if (!eventId) {
+      throw new Error('No event_id returned from POST — check POST response in console (POST may have different shape).');
+    }
 
-                    // REPLACED: Switched to the new two-step fetch logic
-                    
-                    // Step 1: POST to submit the job
-                    const postResponse = await fetch(postUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(postPayload)
-                    });
+    // Step 2: try SSE stream fetch
+    const getUrl = `https://dedeep007-aicloak.hf.space/gradio_api/call/run_humanizer/${eventId}`;
+    const getResponse = await fetch(getUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'text/event-stream' },
+    });
 
-                    if (!postResponse.ok) {
-                        const errorText = await postResponse.text();
-                        // Check if the error is 404, which was the original problem
-                        if(postResponse.status === 404) {
-                             throw new Error(`HTTP error (POST)! status: 404. The API endpoint seems to be incorrect or down.`);
-                        }
-                        throw new Error(`HTTP error (POST)! status: ${postResponse.status}, message: ${errorText}`);
-                    }
+    if (!getResponse.ok) {
+      const errText = await getResponse.text().catch(()=>'<no-body>');
+      throw new Error(`GET-stream failed: ${getResponse.status} ${getResponse.statusText} — ${errText}`);
+    }
 
-                    const postResult = await postResponse.json();
-                    const eventId = postResult.event_id;
+    // Read stream as text (most servers return the whole SSE text on response.text())
+    const streamText = await getResponse.text();
+    console.log('Raw streamText:', streamText.slice ? streamText.slice(0, 4000) : streamText);
 
-                    if (!eventId) {
-                        throw new Error("Could not get a valid event ID from the server.");
-                    }
+    // Robust SSE parser: group consecutive "data:" lines into blocks separated by blank lines
+    function parseSSEBlocks(sseText) {
+      const lines = sseText.split(/\r?\n/);
+      const blocks = [];
+      let buffer = [];
+      for (let i = 0; i < lines.length; i++) {
+        const line = lines[i];
+        if (line.startsWith('data:')) {
+          buffer.push(line.replace(/^data:\s?/, ''));
+        } else if (line.trim() === '') {
+          if (buffer.length) {
+            blocks.push(buffer.join('\n'));
+            buffer = [];
+          }
+        } else {
+          // ignore other lines (id:, event:, retry:, etc.)
+        }
+      }
+      if (buffer.length) blocks.push(buffer.join('\n'));
+      return blocks;
+    }
 
-                    // Step 2: GET to stream the result
-                    const getUrl = `https://dedeep007-aicloak.hf.space/gradio_api/call/run_humanizer/${eventId}`;
-                    
-                    // We fetch from the GET endpoint. The browser will wait until the stream completes.
-                    const getResponse = await fetch(getUrl, {
-                        method: 'GET',
-                        headers: { 'Accept': 'text/event-stream' }
-                    });
+    const blocks = parseSSEBlocks(streamText);
+    console.log('SSE blocks found:', blocks.length, blocks.map(b => (b.length>200? b.slice(0,200)+'...': b)));
 
-                    if (!getResponse.ok) {
-                        const errorText = await getResponse.text();
-                        throw new Error(`HTTP error (GET)! status: ${getResponse.status}, message: ${errorText}`);
-                    }
+    // find the process_completed or process_failed block
+    let completedJson = null;
+    for (const block of blocks) {
+      try {
+        const j = JSON.parse(block);
+        // Gradio sends complex objects; look for msg/process_completed
+        if (j.msg === 'process_completed' || (j.output && j.output.status === 'COMPLETE')) {
+          completedJson = j;
+          break;
+        }
+        if (j.msg === 'process_failed' || (j.output && j.output.status === 'FAILED')) {
+          // bubble useful error
+          const err = j.output?.error || JSON.stringify(j);
+          throw new Error(`AI processing failed: ${err}`);
+        }
+      } catch (e) {
+        // not JSON or parse error — skip
+        console.warn('Failed to JSON.parse SSE block (ignored):', e);
+      }
+    }
 
-                    // Read the entire event stream as text
-                    const streamText = await getResponse.text();
+    // If we parsed a process_completed, extract output
+    if (completedJson) {
+      // Standard Gradio wrapper: completedJson.output.data[0]
+      const out = completedJson.output?.data?.[0] ?? (completedJson?.output || null);
+      if (typeof out === 'string') {
+        setOutputText(out);
+        return;
+      } else if (Array.isArray(out) && typeof out[0] === 'string') {
+        setOutputText(out[0]);
+        return;
+      } else {
+        console.warn('Completed JSON found but unexpected shape:', completedJson);
+        // continue to fallback
+      }
+    }
 
-                    // Parse the event stream to find the completion message
-                    const lines = streamText.trim().split('\n');
-                    const completedLine = lines.find(line => line.includes('"msg": "process_completed"'));
-                    
-                    if (!completedLine) {
-                        // Check for a failure message
-                        const failedLine = lines.find(line => line.includes('"msg": "process_failed"'));
-                        if (failedLine) {
-                            const errorJson = JSON.parse(failedLine.substring('data: '.length));
-                            throw new Error(`AI processing failed: ${errorJson.output?.error || 'Unknown error'}`);
-                        }
-                        console.error("Stream response (no completion):", streamText);
-                        throw new Error("Stream did not complete or returned an unexpected response.");
-                    }
+    // FALLBACK: if SSE parsing didn't yield a completed result, try a JSON GET (some servers return JSON instead of SSE)
+    console.warn('No process_completed found in SSE. Trying JSON GET fallback.');
+    const jsonGetResponse = await fetch(getUrl, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
 
-                    // Extract the JSON string from the "data: " prefix
-                    const jsonString = completedLine.substring('data: '.length);
-                    const result = JSON.parse(jsonString);
+    if (!jsonGetResponse.ok) {
+      const t = await jsonGetResponse.text().catch(()=>'<no-body>');
+      throw new Error(`Fallback JSON GET failed: ${jsonGetResponse.status} ${jsonGetResponse.statusText} — ${t}`);
+    }
 
-                    // Extract the final output from the complex result object
-                    if (result.output && result.output.data && typeof result.output.data[0] === 'string') {
-                        setOutputText(result.output.data[0]);
-                    } else {
-                        console.error("Unexpected data structure in completed stream:", result);
-                        throw new Error("Unexpected data structure in completed stream.");
-                    }
+    const jsonGet = await jsonGetResponse.json().catch(()=>null);
+    console.log('Fallback JSON GET response:', jsonGet);
 
-                } catch (err) {
-                    console.error('Error during humanization:', err);
-                    setError(`An error occurred: ${err.message}`);
-                } finally {
-                    setIsLoading(false);
-                }
-            };
+    // Try to extract output from common shapes
+    const candidate = jsonGet?.output ?? (jsonGet?.data?.[0] ?? jsonGet);
+    if (candidate) {
+      if (typeof candidate === 'string') {
+        setOutputText(candidate);
+        return;
+      } else if (Array.isArray(candidate) && typeof candidate[0] === 'string') {
+        setOutputText(candidate[0]);
+        return;
+      } else if (candidate?.data && typeof candidate.data[0] === 'string') {
+        setOutputText(candidate.data[0]);
+        return;
+      }
+    }
+
+    // if we still didn't get result, throw with helpful debug hint
+    throw new Error('Stream did not complete or returned an unexpected response. Check the console logs for `Raw streamText` and `SSE blocks found` to inspect the server response.');
+
+  } catch (err) {
+    console.error('Error during humanization:', err);
+    setError(`An error occurred: ${err.message}`);
+  } finally {
+    setIsLoading(false);
+  }
+};
 
             // Helper to determine button text
             const getButtonText = () => {
