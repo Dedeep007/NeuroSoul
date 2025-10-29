@@ -340,9 +340,21 @@ const handleHumanize = async () => {
 
     // find the process_completed or process_failed block
     let completedJson = null;
+    let foundResult = false; // Add a flag
+
     for (const block of blocks) {
       try {
         const j = JSON.parse(block);
+
+        // NEW CHECK: Is this the data itself?
+        // Check if j is an array and its first element is a string.
+        if (Array.isArray(j) && j.length > 0 && typeof j[0] === 'string') {
+            console.log("Found direct data array in SSE block.");
+            setOutputText(j[0]);
+            foundResult = true;
+            break; 
+        }
+
         // Gradio sends complex objects; look for msg/process_completed
         if (j.msg === 'process_completed' || (j.output && j.output.status === 'COMPLETE')) {
           completedJson = j;
@@ -357,6 +369,13 @@ const handleHumanize = async () => {
         // not JSON or parse error — skip
         console.warn('Failed to JSON.parse SSE block (ignored):', e);
       }
+    }
+
+    // If we found a result, we can skip the rest
+    if (foundResult) {
+        // We already set the output, so just return
+        // The finally block will run
+        return;
     }
 
     // If we parsed a process_completed, extract output
@@ -569,3 +588,5 @@ const handleHumanize = async () => {
     </script>
 </body>
 </html>
+
+
