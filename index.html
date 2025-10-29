@@ -33,7 +33,7 @@
     <!-- 5. Babel Standalone (for JSX) -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
-    <!-- NOTE: The Gradio client is loaded dynamically within the React app using import() -->
+    <!-- NOTE: The Gradio client is no longer used. We use fetch() instead. -->
     
     <style>
         /* Base styling */
@@ -277,6 +277,7 @@ const handleHumanize = async () => {
     // Step 1: submit job
     const postResponse = await fetch(postUrl, {
       method: 'POST',
+      mode: 'cors', // Explicitly set mode
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(postPayload),
       // optional: keep credentials if server expects cookies
@@ -299,6 +300,7 @@ const handleHumanize = async () => {
     const getUrl = `https://dedeep007-aicloak.hf.space/gradio_api/call/run_humanizer/${eventId}`;
     const getResponse = await fetch(getUrl, {
       method: 'GET',
+      mode: 'cors', // Explicitly set mode
       headers: { 'Accept': 'text/event-stream' },
     });
 
@@ -377,6 +379,7 @@ const handleHumanize = async () => {
     console.warn('No process_completed found in SSE. Trying JSON GET fallback.');
     const jsonGetResponse = await fetch(getUrl, {
       method: 'GET',
+      mode: 'cors', // Explicitly set mode
       headers: { 'Accept': 'application/json' }
     });
 
@@ -566,5 +569,3 @@ const handleHumanize = async () => {
     </script>
 </body>
 </html>
-
-
