@@ -516,12 +516,12 @@ const handleHumanize = async () => {
                                             label="Frequency Ratio"
                                             id="freq-ratio"
                                             min="0"
-                                            max="100"
-                                            step="1"
+                                            max="10"
+                                            step="0.01"
                                             value={freqRatio}
                                             onChange={(e) => setFreqRatio(Number(e.target.value))}
                                             displayValue={`${freqRatio}%`}
-                                            description="Similar word frequency vs. original. Higher % is safer, lower % is creative. Recommended: 5-10%"
+                                            description="Similar word frequency vs. original. Higher % is safer, lower % is creative. Recommended: 0-1%"
                                         />
                                         <div>
                                             <label
